@@ -33,6 +33,7 @@ import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
@@ -52,10 +53,15 @@ import id.zelory.compressor.Compressor;
 
 public class AccountSetup extends AppCompatActivity {
 
-    private CircleImageView profileImage;
-    private Uri profileImageUri = null;
+    private static final int PICK_IMAGE_REQUEST = 111;
     EditText setupUserName;
     Button setUpSave;
+    UploadTask imageStorage;
+    //final StorageReference profilefilePath = null;
+    String profilepicUrl;
+    String userName;
+    private CircleImageView profileImage;
+    private Uri profileImageUri = null;
     private String user_id;
     private boolean isChanged = false;
     private StorageReference storageReference;
@@ -63,11 +69,7 @@ public class AccountSetup extends AppCompatActivity {
     private ProgressBar setUpProgressBar;
     private FirebaseFirestore firebaseFirestore;
     private Bitmap compressedImageFile;
-    UploadTask imageStorage;
-    //final StorageReference profilefilePath = null;
-    String profilepicUrl;
-    String userName;
-    private static final int PICK_IMAGE_REQUEST = 111;
+    private String currentUser;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -84,14 +86,14 @@ public class AccountSetup extends AppCompatActivity {
         setUpProgressBar = findViewById(R.id.setUp_progressBar);
         mAuth = FirebaseAuth.getInstance();
         user_id = mAuth.getCurrentUser().getUid();
+        currentUser = getUser();
 
 
         storageReference = FirebaseStorage.getInstance().getReference();
-        //storageReference = FirebaseStorage.getInstance().getReference().child("profile_images");
         firebaseFirestore = FirebaseFirestore.getInstance();
 
 
-        firebaseFirestore.collection("Users").document(user_id).get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
+        firebaseFirestore.collection("Users").document(currentUser).get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
             @Override
             public void onComplete(@NonNull Task<DocumentSnapshot> task) {
 
@@ -104,9 +106,9 @@ public class AccountSetup extends AppCompatActivity {
                         setupUserName.setText(name);
 
                         profileImageUri = Uri.parse(image);
-                      /*  RequestOptions placeHolderRequest = new RequestOptions();
-                      //  placeHolderRequest.placeholder(R.drawable.com_facebook_profile_picture_blank_portrait);
-                        Glide.with(AccountSetup.this).setDefaultRequestOptions(placeHolderRequest).load(image).into(profileImage);*/
+                        //RequestOptions placeHolderRequest = new RequestOptions();
+                        //placeHolderRequest.placeholder(R.drawable.com_facebook_profile_picture_blank_portrait);
+                        //Glide.with(AccountSetup.this).setDefaultRequestOptions(placeHolderRequest).load(image).into(profileImage);
                         Picasso.get().load(profilepicUrl).into(profileImage);
                     }
                 } else {
@@ -115,6 +117,8 @@ public class AccountSetup extends AppCompatActivity {
                     Toast.makeText(AccountSetup.this, "FireStore Error: " + Error, Toast.LENGTH_LONG).show();
                 }
             }
+
+
         });
 
 
@@ -142,221 +146,122 @@ public class AccountSetup extends AppCompatActivity {
             @Override
             public void onClick(View v) {
 
-                userName = setupUserName.getText().toString();
-                if (!TextUtils.isEmpty(userName) && profileImageUri != null) {
-                    setUpProgressBar.setVisibility(View.VISIBLE);
+                try {
 
-                    Toast.makeText(AccountSetup.this, "save btn fired", Toast.LENGTH_SHORT).show();
+                    userName = setupUserName.getText().toString();
+                    if (!TextUtils.isEmpty(userName) && profileImageUri != null) {
+                        setUpProgressBar.setVisibility(View.VISIBLE);
+
+                        Toast.makeText(AccountSetup.this, "save btn fired", Toast.LENGTH_SHORT).show();
 
 
-                    if (isChanged) {
+                        if (isChanged) {
 
-                        user_id = mAuth.getCurrentUser().getUid();
-                        File newImageFile = new File(profileImageUri.getPath());
-                        try {
+                            user_id = mAuth.getCurrentUser().getUid();
+                            File newImageFile = new File(profileImageUri.getPath());
+                            try {
 
-                            compressedImageFile = new Compressor(AccountSetup.this)
-                                    .setMaxHeight(125)
-                                    .setMaxWidth(125)
-                                    .setQuality(50)
-                                    .compressToBitmap(newImageFile);
+                                compressedImageFile = new Compressor(AccountSetup.this)
+                                        .setMaxHeight(125)
+                                        .setMaxWidth(125)
+                                        .setQuality(50)
+                                        .compressToBitmap(newImageFile);
 
-                        } catch (IOException e) {
-                            e.printStackTrace();
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+
+                            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                            compressedImageFile.compress(Bitmap.CompressFormat.JPEG, 100, baos);
+                            byte[] thumbData = baos.toByteArray();
+
+
+                            imageStorage = storageReference.child("profile_images").child(user_id + ".jpg").putBytes(thumbData);
+
+                            Toast.makeText(AccountSetup.this, "profile pics Upload" + imageStorage.toString(), Toast.LENGTH_SHORT).show();
+
+
+                            final String randomName = UUID.randomUUID().toString();
+                            final StorageReference profileFilePath = storageReference.child("profile_images").child(randomName + ".jpg");
+
+                            Task<Uri> urlTask = imageStorage.continueWithTask(new Continuation<UploadTask.TaskSnapshot, Task<Uri>>() {
+                                @Override
+                                public Task<Uri> then(@NonNull Task<UploadTask.TaskSnapshot> task) throws Exception {
+
+                                    Toast.makeText(AccountSetup.this, "send To FireStore is reached", Toast.LENGTH_SHORT).show();
+
+
+                                    return profileFilePath.getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
+                                        @Override
+                                        public void onSuccess(Uri uri) {
+
+                                            profilepicUrl = uri.toString();
+                                            Toast.makeText(AccountSetup.this, "profile Image url" + profilepicUrl, Toast.LENGTH_SHORT).show();
+
+                                        }
+                                    });
+
+                                }
+
+
+                            }).addOnCompleteListener(new OnCompleteListener<Uri>() {
+                                @Override
+                                public void onComplete(@NonNull Task<Uri> task) {
+
+                                    sendToFireStore();
+
+                                }
+                            });
+
+
+                        } else {
+                            sendToFireStore();
                         }
-
-                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                        compressedImageFile.compress(Bitmap.CompressFormat.JPEG, 100, baos);
-                        byte[] thumbData = baos.toByteArray();
-
-
-                        imageStorage = storageReference.child("profile_images").child(user_id + ".jpg").putBytes(thumbData);
-
-                        Toast.makeText(AccountSetup.this, "profile pics Upload" + imageStorage.toString(), Toast.LENGTH_SHORT).show();
-
-
-                        final String randomName = UUID.randomUUID().toString();
-                        final StorageReference profilefilePath = storageReference.child("profile_images").child(randomName + ".jpg");
-
-                        Task<Uri> urlTask = imageStorage.continueWithTask(new Continuation<UploadTask.TaskSnapshot, Task<Uri>>() {
-                            @Override
-                            public Task<Uri> then(@NonNull Task<UploadTask.TaskSnapshot> task) throws Exception {
-
-                                Toast.makeText(AccountSetup.this, "send To FireStore is reached", Toast.LENGTH_SHORT).show();
-
-                                return profilefilePath.getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
-
-
-                                    @Override
-                                    public void onSuccess(Uri uri) {
-
-                                        Toast.makeText(AccountSetup.this, "send To FireStore onSuccess reached", Toast.LENGTH_SHORT).show();
-
-                                        profilepicUrl = uri.toString();
-
-
-                                        Map<String, String> userMap = new HashMap<>();
-                                        userMap.put("name", userName);
-                                        userMap.put("image", profilepicUrl);
-
-                                        Toast.makeText(AccountSetup.this, "profilePic:" + profilepicUrl, Toast.LENGTH_LONG).show();
-
-                                        firebaseFirestore.collection("Users").document(user_id).set(userMap).addOnCompleteListener(new OnCompleteListener<Void>() {
-                                            @Override
-                                            public void onComplete(@NonNull Task<Void> task) {
-
-                                                if (task.isSuccessful()) {
-
-                                                    Intent intent = new Intent(AccountSetup.this, MainActivity.class);
-                                                    startActivity(intent);
-                                                    finish();
-
-                                                } else {
-                                                    String Error = task.getException().getMessage();
-                                                    Toast.makeText(AccountSetup.this, "Error: " + Error, Toast.LENGTH_LONG).show();
-                                                }
-
-                                                setUpProgressBar.setVisibility(View.GONE);
-                                            }
-                                        });
-
-                                    }
-                                });
-
-                            }
-
-
-                        }).addOnCompleteListener(new OnCompleteListener<Uri>() {
-                            @Override
-                            public void onComplete(@NonNull Task<Uri> task) {
-
-                                profilefilePath.getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
-                                    @Override
-                                    public void onSuccess(Uri uri) {
-
-                                        String ss = uri.toString();
-                                        Toast.makeText(AccountSetup.this, "new downloadUrl" + ss, Toast.LENGTH_LONG).show();
-                                    }
-                                });
-
-
-                            }
-                        });
-
-
-                    } else {
-                        //sendToFireStore();
                     }
-                }
 
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         });
     }
 
-/*
     private void sendToFireStore() {
+        Map<String, String> userMap = new HashMap<>();
+        userMap.put("name", userName);
+        userMap.put("image", profilepicUrl);
 
-        final String randomName = UUID.randomUUID().toString();
-        final StorageReference profilefilePath = storageReference.child("profile_images").child(randomName + ".jpg");
+        Toast.makeText(AccountSetup.this, "profilePicUrl:" + profilepicUrl, Toast.LENGTH_LONG).show();
 
-        Task<Uri> urlTask = imageStorage.continueWithTask(new Continuation<UploadTask.TaskSnapshot, Task<Uri>>() {
-            @Override
-            public Task<Uri> then(@NonNull Task<UploadTask.TaskSnapshot> task) throws Exception {
-                Toast.makeText(AccountSetup.this, "send To FireStore is reached", Toast.LENGTH_SHORT).show();
-
-               *//* return profilefilePath.getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
-
-
+        firebaseFirestore.collection("Users")
+                .document(currentUser)
+                .set(userMap)
+                .addOnCompleteListener(new OnCompleteListener<Void>() {
 
                     @Override
-                    public void onSuccess(Uri uri) {
+                    public void onComplete(@NonNull Task<Void> task) {
 
-                        Toast.makeText(AccountSetup.this, "send To FireStore onSuccess reached" ,Toast.LENGTH_SHORT).show();
+                        if (task.isSuccessful()) {
 
-                        profilepicUrl = uri.toString();
+                            Intent intent = new Intent(AccountSetup.this, MainActivity.class);
+                            startActivity(intent);
+                            finish();
 
+                        } else {
+                            String Error = task.getException().getMessage();
+                            Toast.makeText(AccountSetup.this, "Error: " + Error, Toast.LENGTH_LONG).show();
+                        }
 
-                        Map<String, String > userMap = new HashMap<>();
-                        userMap.put("name",userName);
-                        userMap.put("image", profilepicUrl);
-
-                        Toast.makeText(AccountSetup.this, "profilePic:"+ profilepicUrl,Toast.LENGTH_LONG).show();
-
-                        firebaseFirestore.collection("Users").document(user_id).set(userMap).addOnCompleteListener(new OnCompleteListener<Void>() {
-                            @Override
-                            public void onComplete(@NonNull Task<Void> task) {
-
-                                if(task.isSuccessful()){
-
-                                    Intent intent = new Intent(AccountSetup.this, MainActivity.class);
-                                    startActivity(intent);
-                                    finish();
-
-                                }else{
-                                    String Error = task.getException().getMessage();
-                                    Toast.makeText(AccountSetup.this,"Error: "+ Error, Toast.LENGTH_LONG).show();
-                                }
-
-                                setUpProgressBar.setVisibility(View.GONE);
-                            }
-                        });
-
-                    }
-                });*//*
-
-               *//*return profilefilePath.getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
-                   @Override
-                   public void onSuccess(Uri uri) {
-
-                       profilepicUrl = uri.toString();
-                       Log.d("downloadUrl", profilepicUrl);
-                       Toast.makeText(AccountSetup.this, "downloadUrl:"+profilepicUrl, Toast.LENGTH_SHORT).show();
-
-                       Map<String, String > userMap = new HashMap<>();
-                       userMap.put("name",userName);
-                       userMap.put("image", profilepicUrl);
-
-                       firebaseFirestore.collection("Users").add(userMap).addOnCompleteListener(new OnCompleteListener<DocumentReference>() {
-                           @Override
-                           public void onComplete(@NonNull Task<DocumentReference> task) {
-
-                               if (task.isSuccessful()) {
-                                   Toast.makeText(AccountSetup.this, "Post Added Successfully", Toast.LENGTH_SHORT).show();
-                                   Intent intent = new Intent(AccountSetup.this, MainActivity.class);
-                                   startActivity(intent);
-                                   finish();
-
-                               } else {
-                                   String Error = task.getException().getMessage();
-                                   Toast.makeText(AccountSetup.this, "Error: " + Error, Toast.LENGTH_LONG).show();
-                               }
-                           }
-                       });
-                   }
-               });*//*
-                return null;
-            }
-
-
-        }).addOnCompleteListener(new OnCompleteListener<Uri>() {
-            @Override
-            public void onComplete(@NonNull Task<Uri> task) {
-
-                profilefilePath.getDownloadUrl().addOnSuccessListener(new OnSuccessListener<Uri>() {
-                    @Override
-                    public void onSuccess(Uri uri) {
-
-                        String ss = uri.toString();
-                        Toast.makeText(AccountSetup.this, "new downloadUrl" + ss, Toast.LENGTH_LONG).show();
+                        setUpProgressBar.setVisibility(View.GONE);
                     }
                 });
 
+    }
 
-            }
-        });
-
-
-    }*/
+    public String getUser() {
+        String user = mAuth.getCurrentUser().getUid();
+        return user;
+    }
 
 
     private void cropImage() {

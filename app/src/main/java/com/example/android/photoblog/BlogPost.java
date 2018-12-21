@@ -7,11 +7,11 @@ import java.util.Date;
 public class BlogPost {
 
     public String image_url, user_id, desc;
-    public Date timeStamp;
+    public String timeStamp;
 
     public BlogPost(){}
 
-    public BlogPost(String image_url, String user_id, String desc,Date timeStamp) {
+    public BlogPost(String image_url, String user_id, String desc, String timeStamp) {
         this.image_url = image_url;
         this.user_id = user_id;
         this.desc = desc;
@@ -42,11 +42,11 @@ public class BlogPost {
         this.desc = desc;
     }
 
-    public Date getTimeStamp() {
+    public String getTimeStamp() {
         return timeStamp;
     }
 
-    public void setTimeStamp(Date timeStamp) {
+    public void setTimeStamp(String timeStamp) {
         this.timeStamp = timeStamp;
     }
 }

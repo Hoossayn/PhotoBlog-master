@@ -56,11 +56,17 @@ public class BlogRecyclerAdapter extends RecyclerView.Adapter<BlogRecyclerAdapte
         String imageUrl = blog_list.get(i).getImage_url();
         viewHolder.setBlogPhoto(imageUrl);
 
-        long millisecond = blog_list.get(i).getTimeStamp().getTime();
 
-        SimpleDateFormat sm  = new SimpleDateFormat("mm-dd-yyyy");
-        String dateFormat = sm.format(millisecond);
-        viewHolder.setBlogTime(dateFormat);
+        try {
+            long millisecond = Long.parseLong(blog_list.get(i).getTimeStamp());
+
+            SimpleDateFormat sm = new SimpleDateFormat("mm-dd-yyyy");
+            String dateFormat = sm.format(millisecond);
+            viewHolder.setBlogTime(dateFormat);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
 
         String user_id = blog_list.get(i).getUser_id();
         firestore.collection("Users").document(user_id).get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
