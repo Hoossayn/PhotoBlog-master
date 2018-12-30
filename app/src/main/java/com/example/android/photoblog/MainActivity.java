@@ -45,6 +45,8 @@ public class MainActivity extends AppCompatActivity {
 
 
         mAuth = FirebaseAuth.getInstance();
+
+
         firebaseFirestore =  FirebaseFirestore.getInstance();
         mainBottomNav = findViewById(R.id.bottomNavigationView2);
 
@@ -110,6 +112,9 @@ public class MainActivity extends AppCompatActivity {
            sendToLoginPage();
         }else{
             current_user_id = mAuth.getCurrentUser().getUid();
+            if (current_user_id != null) ;
+            /*
+            current_user_id = mAuth.getCurrentUser().getUid();
             firebaseFirestore.collection("Users").document(current_user_id).get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
                 @Override
                 public void onComplete(@NonNull Task<DocumentSnapshot> task) {
@@ -130,6 +135,7 @@ public class MainActivity extends AppCompatActivity {
 
                 }
             });
+        */
         }
     }
 
@@ -154,6 +160,7 @@ public class MainActivity extends AppCompatActivity {
             case R.id.action_setting:
                 Intent settingsIntent  = new Intent(MainActivity.this, AccountSetup.class);
                 startActivity(settingsIntent);
+                finish();
                 return true;
 
                 default:
@@ -177,5 +184,6 @@ public class MainActivity extends AppCompatActivity {
         FragmentTransaction fragmentTransaction = getSupportFragmentManager().beginTransaction();
         fragmentTransaction.replace(R.id.fragment_container,fragment);
         fragmentTransaction.commit();
+
     }
 }

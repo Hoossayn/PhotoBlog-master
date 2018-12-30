@@ -4,7 +4,7 @@ package com.example.android.photoblog;
 import java.sql.Timestamp;
 import java.util.Date;
 
-public class BlogPost {
+public class BlogPost extends BlogPostId {
 
     public String image_url, user_id, desc;
     public String timeStamp;
